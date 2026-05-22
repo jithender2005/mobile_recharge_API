@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RechargePro — Sign In</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background:
+                radial-gradient(ellipse 60% 50% at 10% 60%, rgba(201,168,76,0.06) 0%, transparent 70%),
+                radial-gradient(ellipse 40% 40% at 90% 20%, rgba(201,168,76,0.04) 0%, transparent 60%),
+                var(--bg);
+        }
+
+        .login-wrap {
+            width: 100%;
+            max-width: 440px;
+            padding: 24px;
+        }
+
+        .login-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 52px 44px 44px;
+        }
+
+        .brand {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .brand-mark {
+            width: 52px;
+            height: 52px;
+            border: 1px solid var(--gold-dim);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 18px;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--gold);
+        }
+
+        .brand-name {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            color: var(--text);
+        }
+
+        .brand-sub {
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            margin-top: 6px;
+        }
+
+        .error-msg {
+            background: var(--danger-bg);
+            border: 1px solid rgba(201,85,85,0.25);
+            color: var(--danger);
+            font-size: 12px;
+            padding: 10px 14px;
+            margin-bottom: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="login-wrap">
+    <div class="login-card">
+
+        <div class="brand">
+            <div class="brand-mark">R</div>
+            <div class="brand-name">RechargePro</div>
+            <div class="brand-sub">Dealer Portal</div>
+        </div>
+
+        <div id="error-msg" class="error-msg"></div>
+
+        <div class="form-group">
+            <label class="form-label">Username</label>
+            <input type="text" id="username" class="form-input" placeholder="Enter your username"
+                   autocomplete="username" onkeydown="if(event.key==='Enter') handleLogin()">
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Password</label>
+            <input type="password" id="password" class="form-input" placeholder="Enter your password"
+                   autocomplete="current-password" onkeydown="if(event.key==='Enter') handleLogin()">
+        </div>
+
+        <button class="btn-primary" id="login-btn" style="width:100%;margin-top:8px" onclick="handleLogin()">
+            Sign In
+        </button>
+
+    </div>
+</div>
+
+<script>
+    // If already logged in, redirect based on role
+    const existingToken = sessionStorage.getItem('rp_token');
+    const existingRole  = sessionStorage.getItem('rp_role');
+    if (existingToken) {
+        window.location.href = existingRole === 'ADMIN' ? 'dashboard.html' : 'dealer-dashboard.html';
+    }
+
+    async function handleLogin() {
+        const user = document.getElementById('username').value.trim();
+        const pass = document.getElementById('password').value.trim();
+        const btn  = document.getElementById('login-btn');
+        const err  = document.getElementById('error-msg');
+
+        err.style.display = 'none';
+
+        if (!user || !pass) {
+            err.textContent = 'Please enter both username and password.';
+            err.style.display = 'block';
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Signing in...';
+
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user, password: pass })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                sessionStorage.setItem('rp_token',    data.token);
+                sessionStorage.setItem('rp_user',     data.username);
+                sessionStorage.setItem('rp_role',     data.role);
+                sessionStorage.setItem('rp_operator', data.operator || '');
+
+                // Redirect based on role
+                if (data.role === 'ADMIN') {
+                    window.location.href = 'dashboard.html';
+                } else {
+                    window.location.href = 'dealer-dashboard.html';
+                }
+            } else {
+                err.textContent = 'Invalid username or password.';
+                err.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Sign In';
+            }
+        } catch (e) {
+            err.textContent = 'Server error. Please try again.';
+            err.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Sign In';
+        }
+    }
+</script>
+</body>
+</html>

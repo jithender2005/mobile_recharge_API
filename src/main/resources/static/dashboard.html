@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RechargePro — Admin Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-brand">RechargePro</div>
+  <div class="nav-links">
+    <a href="dashboard.html" class="nav-link active">Dashboard</a>
+    <a href="search.html" class="nav-link">Search</a>
+  </div>
+  <div class="nav-right">
+    <span class="nav-user" id="nav-user">User</span>
+    <button class="btn-ghost" onclick="logout()">Sign Out</button>
+  </div>
+</nav>
+
+<main class="page">
+
+  <div class="page-header">
+    <h1 class="page-title">Admin Dashboard</h1>
+    <p class="page-sub">Live system overview and transaction tracking control</p>
+  </div>
+
+  <!-- STATS GRID — 5 cards -->
+  <div class="stats-grid" style="grid-template-columns: repeat(5, 1fr);">
+    <div class="stat-card">
+      <div class="stat-label">Total Requests</div>
+      <div class="stat-value c-gold" id="stat-total">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pending</div>
+      <div class="stat-value c-warning" id="stat-pending">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Completed</div>
+      <div class="stat-value c-success" id="stat-completed">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Failed</div>
+      <div class="stat-value c-danger" id="stat-failed">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Amount</div>
+      <div class="stat-value c-gold" id="stat-amount">—</div>
+    </div>
+  </div>
+
+  <div class="highlight-panel" style="margin-bottom: 40px;">
+    <div style="padding: 20px; border-bottom: 1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+      <div class="section-label" style="color: var(--warning); font-weight: 500;">★ Action Required — Latest Pending Requests</div>
+      <span class="mono" id="pending-count-tag" style="font-size:11px; color:var(--warning)">0 items waiting</span>
+    </div>
+    <div class="table-wrap" style="border:none;">
+      <table>
+        <thead>
+        <tr>
+          <th>ID</th>
+          <th>MSISDN</th>
+          <th>Amount</th>
+          <th>Operator</th>
+          <th>Created</th>
+          <th>Action Control</th>
+        </tr>
+        </thead>
+        <tbody id="pending-table-body">
+        <tr><td colspan="6" class="empty-state">No pending requests require attention.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:40px">
+    <div style="background:var(--bg-card);border:1px solid var(--border);padding:24px">
+      <div class="section-label" style="margin-bottom:16px">Recharges Per Day</div>
+      <canvas id="lineChart" height="120"></canvas>
+    </div>
+    <div style="background:var(--bg-card);border:1px solid var(--border);padding:24px">
+      <div class="section-label" style="margin-bottom:16px">Amount Recharged Per Day (₹)</div>
+      <canvas id="barChart" height="120"></canvas>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <span class="section-label">All Recent History Logs</span>
+    <button class="btn-ghost" onclick="loadDashboard()">↻ Refresh Records</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+      <tr>
+        <th>ID</th>
+        <th>MSISDN</th>
+        <th>Amount</th>
+        <th>Operator</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th>Updated</th>
+        <th>View</th>
+      </tr>
+      </thead>
+      <tbody id="history-table-body">
+      <tr><td colspan="8" class="empty-state"><span class="spinner"></span> Loading System History...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</main>
+
+<a href="submit.html" class="fab-submit">
+  +
+  <span class="fab-tooltip">New Request</span>
+</a>
+
+<div id="toast"></div>
+
+<script>
+  const API = '';
+  const token = sessionStorage.getItem('rp_token');
+  const role  = sessionStorage.getItem('rp_role');
+
+  if (!token) window.location.href = 'index.html';
+  if (role !== 'ADMIN') window.location.href = 'dealer-dashboard.html';
+
+  document.getElementById('nav-user').textContent = sessionStorage.getItem('rp_user') || 'Admin';
+
+  function authHeaders() {
+      return { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+  }
+
+  function logout() {
+      sessionStorage.clear();
+      window.location.href = 'index.html';
+  }
+
+  function showToast(msg, type = 'default') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = type;
+      t.style.display = 'block';
+      setTimeout(() => t.style.display = 'none', 3500);
+  }
+
+  function badgeFor(status) {
+      const map = {
+          PENDING:   '<span class="badge badge-pending">Pending</span>',
+          COMPLETED: '<span class="badge badge-completed">Completed</span>',
+          FAILED:    '<span class="badge badge-failed">Failed</span>',
+      };
+      return map[status] || status;
+  }
+
+  function formatDate(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleString('en-IN', {
+          day: '2-digit', month: 'short', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+      });
+  }
+
+  function formatAmount(amount) {
+      return '₹' + Number(amount).toLocaleString('en-IN', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+      });
+  }
+
+  function buildCharts(all) {
+      const countByDate  = {};
+      const amountByDate = {};
+
+      all.forEach(r => {
+          const date = new Date(r.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+          countByDate[date]  = (countByDate[date]  || 0) + 1;
+          amountByDate[date] = (amountByDate[date] || 0) + Number(r.amount);
+      });
+
+      const labels  = Object.keys(countByDate).slice(-7);
+      const counts  = labels.map(d => countByDate[d]);
+      const amounts = labels.map(d => amountByDate[d]);
+
+      if (window._lineChart) window._lineChart.destroy();
+      if (window._barChart)  window._barChart.destroy();
+
+      const chartDefaults = {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+              x: { ticks: { color: '#888', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+              y: { ticks: { color: '#888', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true }
+          }
+      };
+
+      window._lineChart = new Chart(document.getElementById('lineChart'), {
+          type: 'line',
+          data: {
+              labels,
+              datasets: [{ data: counts, borderColor: '#c9a84c', backgroundColor: 'rgba(201,168,76,0.08)', borderWidth: 2, pointBackgroundColor: '#c9a84c', tension: 0.4, fill: true }]
+          },
+          options: chartDefaults
+      });
+
+      window._barChart = new Chart(document.getElementById('barChart'), {
+          type: 'bar',
+          data: {
+              labels,
+              datasets: [{ data: amounts, backgroundColor: 'rgba(201,168,76,0.5)', borderColor: '#c9a84c', borderWidth: 1, borderRadius: 4 }]
+          },
+          options: chartDefaults
+      });
+  }
+
+  async function loadDashboard() {
+      try {
+          const [pRes, cRes, fRes] = await Promise.all([
+              fetch(`${API}/api/recharges/status?status=PENDING&page=0&size=100`,   { headers: authHeaders() }),
+              fetch(`${API}/api/recharges/status?status=COMPLETED&page=0&size=50`, { headers: authHeaders() }),
+              fetch(`${API}/api/recharges/status?status=FAILED&page=0&size=50`,    { headers: authHeaders() }),
+          ]);
+
+          const [pData, cData, fData] = await Promise.all([pRes.json(), cRes.json(), fRes.json()]);
+
+          const pending   = pData.content || [];
+          const completed = cData.content || [];
+          const failed    = fData.content || [];
+          const all       = [...pending, ...completed, ...failed];
+
+          // Stats
+          document.getElementById('stat-pending').textContent   = pending.length;
+          document.getElementById('stat-completed').textContent = completed.length;
+          document.getElementById('stat-failed').textContent    = failed.length;
+          document.getElementById('stat-total').textContent     = all.length;
+          document.getElementById('pending-count-tag').textContent = `${pending.length} items waiting`;
+
+          // Total amount — sum of ALL requests
+          const totalAmount = all.reduce((sum, r) => sum + Number(r.amount), 0);
+          document.getElementById('stat-amount').textContent = formatAmount(totalAmount);
+
+          const analyticsDataSet = [...all].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+          buildCharts(analyticsDataSet);
+
+          // Pending table
+          const pendingBody = document.getElementById('pending-table-body');
+          if (pending.length === 0) {
+              pendingBody.innerHTML = `<tr><td colspan="6" class="empty-state">No pending requests require attention.</td></tr>`;
+          } else {
+              pendingBody.innerHTML = pending.map(r => `
+                  <tr>
+                      <td><span class="mono">#${r.id}</span></td>
+                      <td>${r.msisdn}</td>
+                      <td style="color:var(--gold)">₹${Number(r.amount).toFixed(2)}</td>
+                      <td><span class="operator-tag" style="font-size:10px">${r.operator}</span></td>
+                      <td><span class="mono" style="font-size:12px">${formatDate(r.createdAt)}</span></td>
+                      <td id="pending-actions-${r.id}">
+                          <button class="action-btn complete" onclick="updateStatus(${r.id},'complete')">Complete</button>
+                          <button class="action-btn fail" onclick="updateStatus(${r.id},'fail')">Fail</button>
+                          <a href="detail.html?id=${r.id}" class="action-btn" style="text-decoration:none">View</a>
+                      </td>
+                  </tr>
+              `).join('');
+          }
+
+          // History table
+          const historyBody = document.getElementById('history-table-body');
+          const historyItems = [...all]
+              .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+              .slice(0, 30);
+
+          if (historyItems.length === 0) {
+              historyBody.innerHTML = `<tr><td colspan="8" class="empty-state">No transactions logged in system database.</td></tr>`;
+              return;
+          }
+
+          historyBody.innerHTML = historyItems.map(r => `
+              <tr>
+                  <td><span class="mono">#${r.id}</span></td>
+                  <td>${r.msisdn}</td>
+                  <td style="color:var(--gold)">₹${Number(r.amount).toFixed(2)}</td>
+                  <td>${r.operator}</td>
+                  <td>${badgeFor(r.status)}</td>
+                  <td><span class="mono" style="font-size:12px">${formatDate(r.createdAt)}</span></td>
+                  <td><span class="mono" style="font-size:12px">${formatDate(r.updatedAt)}</span></td>
+                  <td><a href="detail.html?id=${r.id}" class="action-btn" style="text-decoration:none">Details</a></td>
+              </tr>
+          `).join('');
+
+      } catch (err) {
+          console.error(err);
+          showToast('Failed to populate system telemetry tables.', 'danger');
+      }
+  }
+
+  async function updateStatus(id, action) {
+      const cell = document.getElementById(`pending-actions-${id}`);
+      if (cell) cell.innerHTML = '<span class="spinner"></span>';
+
+      try {
+          const res = await fetch(`${API}/api/recharges/${id}/${action}`, {
+              method: 'PATCH',
+              headers: authHeaders()
+          });
+
+          if (res.ok) {
+              showToast(`Request #${id} execution status processed successfully.`, 'success');
+              loadDashboard();
+          } else {
+              const err = await res.json();
+              showToast(err.message || 'Status execution rejected by service framework.', 'danger');
+              loadDashboard();
+          }
+      } catch (err) {
+          showToast('Network interface communication drop.', 'danger');
+          loadDashboard();
+      }
+  }
+
+  loadDashboard();
+</script>
+</body>
+</html>

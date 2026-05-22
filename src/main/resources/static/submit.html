@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RechargePro — Submit Request</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* Confirmation Modal */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 36px 40px;
+      width: 100%;
+      max-width: 420px;
+    }
+    .modal-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+    .modal-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 28px;
+    }
+    .modal-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-row:last-of-type { border-bottom: none; }
+    .modal-key {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .modal-val {
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 500;
+    }
+    .modal-val.gold { color: var(--gold); }
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    /* Popular Plans */
+    .plans-section {
+      margin-bottom: 32px;
+    }
+    .plans-label {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px;
+    }
+    .plan-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 16px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .plan-card:hover {
+      border-color: var(--gold-dim);
+      background: rgba(201,168,76,0.04);
+    }
+    .plan-card.selected {
+      border-color: var(--gold);
+      background: rgba(201,168,76,0.08);
+    }
+    .plan-amount {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--gold);
+      margin-bottom: 6px;
+    }
+    .plan-name {
+      font-size: 11px;
+      color: var(--text);
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .plan-detail {
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="nav-brand">RechargePro</div>
+  <div class="nav-links">
+    <a href="javascript:void(0)" class="nav-link" id="nav-dashboard-link">Dashboard</a>
+    <a href="submit.html" class="nav-link active">Submit</a>
+    <a href="search.html" class="nav-link">Search</a>
+  </div>
+  <div class="nav-right">
+    <span class="nav-user" id="nav-user"></span>
+    <button class="btn-ghost" onclick="logout()">Sign Out</button>
+  </div>
+</nav>
+
+<!-- CONFIRMATION MODAL -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal">
+    <div class="modal-title">Confirm Recharge Request</div>
+    <div class="modal-sub">Please review before submitting</div>
+    <div class="modal-row">
+      <span class="modal-key">Mobile Number</span>
+      <span class="modal-val" id="conf-msisdn"></span>
+    </div>
+    <div class="modal-row">
+      <span class="modal-key">Amount</span>
+      <span class="modal-val gold" id="conf-amount"></span>
+    </div>
+    <div class="modal-row">
+      <span class="modal-key">Operator</span>
+      <span class="modal-val" id="conf-operator"></span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="confirm-btn" onclick="confirmSubmit()" style="flex:1">
+        Confirm & Submit
+      </button>
+      <button class="btn-secondary" onclick="closeModal()" style="flex:1">
+        Go Back
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<main class="page">
+
+  <div class="page-header">
+    <h1 class="page-title">Submit Recharge</h1>
+    <p class="page-sub" id="page-sub">Create a new recharge request — it starts in PENDING state</p>
+  </div>
+
+  <!-- POPULAR PLANS -->
+  <div class="plans-section">
+    <div class="plans-label">Popular Recharge Plans</div>
+    <div class="plans-grid" id="plans-grid">
+
+      <div class="plan-card" onclick="selectPlan(this, 149)">
+        <div class="plan-amount">₹149</div>
+        <div class="plan-name">Basic</div>
+        <div class="plan-detail">1GB/day · 28 days</div>
+      </div>
+
+      <div class="plan-card" onclick="selectPlan(this, 199)">
+        <div class="plan-amount">₹199</div>
+        <div class="plan-name">Value</div>
+        <div class="plan-detail">1.5GB/day · 28 days</div>
+      </div>
+
+      <div class="plan-card" onclick="selectPlan(this, 299)">
+        <div class="plan-amount">₹299</div>
+        <div class="plan-name">Popular</div>
+        <div class="plan-detail">2GB/day · 56 days</div>
+      </div>
+
+      <div class="plan-card" onclick="selectPlan(this, 399)">
+        <div class="plan-amount">₹399</div>
+        <div class="plan-name">Standard</div>
+        <div class="plan-detail">2.5GB/day · 56 days</div>
+      </div>
+
+      <div class="plan-card" onclick="selectPlan(this, 599)">
+        <div class="plan-amount">₹599</div>
+        <div class="plan-name">Premium</div>
+        <div class="plan-detail">3GB/day · 84 days</div>
+      </div>
+
+      <div class="plan-card" onclick="selectPlan(this, 999)">
+        <div class="plan-amount">₹999</div>
+        <div class="plan-name">Unlimited</div>
+        <div class="plan-detail">Unlimited · 84 days</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="form-card">
+
+    <div class="form-group">
+      <label class="form-label">Mobile Number (MSISDN)</label>
+      <input type="text" id="msisdn" class="form-input"
+             placeholder="Enter exactly 10 digits"
+             maxlength="10" inputmode="numeric">
+      <div class="field-error" id="err-msisdn">Mobile number is required.</div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Amount (₹)</label>
+        <input type="number" id="amount" class="form-input"
+               placeholder="e.g. 199 or select a plan above"
+               min="1" step="0.01">
+        <div class="field-error" id="err-amount">Enter a valid positive amount.</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Operator</label>
+        <div class="select-wrap">
+          <select id="operator" class="form-input form-select">
+            <option value="">— Select operator —</option>
+            <option value="JIO">Jio</option>
+            <option value="AIRTEL">Airtel</option>
+            <option value="BSNL">BSNL</option>
+            <option value="VI">Vi</option>
+          </select>
+        </div>
+        <div class="field-error" id="err-operator">Please select an operator.</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-primary" id="submit-btn" onclick="openConfirmModal()">
+        Submit Request
+      </button>
+      <button class="btn-secondary" onclick="resetForm()">Clear</button>
+    </div>
+
+  </div>
+
+  <!-- SUCCESS RESULT CARD -->
+  <div class="result-card" id="result-card">
+    <div class="result-card-title">Request Created</div>
+    <div class="result-row">
+      <span class="result-key">Request ID</span>
+      <span class="result-value" id="res-id"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-key">Mobile Number</span>
+      <span class="result-value" id="res-msisdn"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-key">Amount</span>
+      <span class="result-value" id="res-amount"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-key">Operator</span>
+      <span class="result-value" id="res-operator"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-key">Status</span>
+      <span class="result-value" id="res-status"></span>
+    </div>
+    <div class="result-row">
+      <span class="result-key">Created At</span>
+      <span class="result-value" id="res-created"></span>
+    </div>
+    <div style="margin-top:20px;display:flex;gap:12px">
+      <button class="btn-primary" onclick="resetForm()" style="padding:10px 24px;font-size:11px">
+        New Request
+      </button>
+      <a id="dash-link" href="dashboard.html" class="btn-secondary"
+         style="padding:10px 24px;font-size:11px;display:inline-block;text-align:center">
+        View Dashboard
+      </a>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+  // Auth guard
+  const token    = sessionStorage.getItem('rp_token');
+  const role     = sessionStorage.getItem('rp_role');
+  const operator = sessionStorage.getItem('rp_operator');
+
+  if (!token) window.location.href = 'index.html';
+
+  // Set dashboard link based on role
+  const dashLink = role === 'ADMIN' ? 'dashboard.html' : 'dealer-dashboard.html';
+  document.getElementById('nav-dashboard-link').href = dashLink;
+  document.getElementById('dash-link').href          = dashLink;
+
+  document.getElementById('nav-user').textContent =
+      sessionStorage.getItem('rp_user') || 'User';
+
+  // If dealer — pre-fill and lock operator field
+  if (role === 'DEALER' && operator) {
+    const sel = document.getElementById('operator');
+    sel.value    = operator;
+    sel.disabled = true;
+    document.getElementById('page-sub').textContent =
+        `Submitting as ${operator} dealer — requests start in PENDING and await admin approval`;
+  }
+
+  const API = '';
+
+  function authHeaders() {
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  }
+
+  // ── POPULAR PLANS ───────────────────────────────────────────────────
+  function selectPlan(card, amount) {
+    // Remove selected from all cards
+    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+    // Highlight clicked card
+    card.classList.add('selected');
+    // Fill amount field
+    document.getElementById('amount').value = amount;
+    // Clear any amount error
+    document.getElementById('err-amount').style.display = 'none';
+    document.getElementById('amount').classList.remove('error');
+  }
+
+  document.getElementById('msisdn').addEventListener('input', function () {
+    this.value = this.value.replace(/\D/g, '').slice(0, 10);
+  });
+
+  // Deselect plan card if user manually types amount
+  document.getElementById('amount').addEventListener('input', function () {
+    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+  });
+
+  function logout() {
+    sessionStorage.clear();
+    window.location.href = 'index.html';
+  }
+
+  function showToast(msg, type = 'default') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = type;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 3500);
+  }
+
+  function clearErrors() {
+    document.querySelectorAll('.field-error').forEach(e => e.style.display = 'none');
+    document.querySelectorAll('.form-input').forEach(e => e.classList.remove('error'));
+  }
+
+  function showError(fieldId, errId, msg) {
+    document.getElementById(fieldId).classList.add('error');
+    const errEl = document.getElementById(errId);
+    if (msg) errEl.textContent = msg;
+    errEl.style.display = 'block';
+  }
+
+  function validate() {
+    clearErrors();
+    let ok = true;
+    const msisdn = document.getElementById('msisdn').value.trim();
+    const amount = document.getElementById('amount').value;
+    const op     = document.getElementById('operator').value;
+
+    if (!msisdn) {
+      showError('msisdn', 'err-msisdn', 'Mobile number is required.');
+      ok = false;
+    } else if (!/^\d{10}$/.test(msisdn)) {
+      showError('msisdn', 'err-msisdn',
+          'Must be exactly 10 digits. You entered ' + msisdn.length + '.');
+      ok = false;
+    }
+
+    if (!amount || parseFloat(amount) <= 0) {
+      showError('amount', 'err-amount', 'Enter a valid positive amount.');
+      ok = false;
+    }
+
+    if (!op) {
+      showError('operator', 'err-operator', 'Please select an operator.');
+      ok = false;
+    }
+
+    return ok;
+  }
+
+  // ── MODAL ──────────────────────────────────────────────────────────
+  function openConfirmModal() {
+    if (!validate()) return;
+
+    const msisdn = document.getElementById('msisdn').value.trim();
+    const amount = parseFloat(document.getElementById('amount').value).toFixed(2);
+    const op     = document.getElementById('operator').value;
+
+    document.getElementById('conf-msisdn').textContent   = msisdn;
+    document.getElementById('conf-amount').textContent   = '₹' + amount;
+    document.getElementById('conf-operator').textContent = op;
+
+    document.getElementById('confirm-modal').classList.add('active');
+  }
+
+  function closeModal() {
+    document.getElementById('confirm-modal').classList.remove('active');
+    const btn = document.getElementById('confirm-btn');
+    btn.disabled    = false;
+    btn.textContent = 'Confirm & Submit';
+  }
+
+  document.getElementById('confirm-modal').addEventListener('click', function (e) {
+    if (e.target === this) closeModal();
+  });
+
+  // ── SUBMIT ─────────────────────────────────────────────────────────
+  let isSubmitting = false;
+
+  async function confirmSubmit() {
+    if (isSubmitting) return;
+    isSubmitting = true;
+
+    const btn = document.getElementById('confirm-btn');
+    btn.disabled  = true;
+    btn.innerHTML = '<span class="spinner"></span> Submitting...';
+
+    const payload = {
+      msisdn:   document.getElementById('msisdn').value.trim(),
+      amount:   parseFloat(document.getElementById('amount').value),
+      operator: document.getElementById('operator').value,
+    };
+
+    try {
+      const res  = await fetch(`${API}/api/recharges`, {
+        method:  'POST',
+        headers: authHeaders(),
+        body:    JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      closeModal();
+
+      if (res.ok) {
+        document.getElementById('res-id').textContent       = '#' + data.id;
+        document.getElementById('res-msisdn').textContent   = data.msisdn;
+        document.getElementById('res-amount').textContent   = '₹' + Number(data.amount).toFixed(2);
+        document.getElementById('res-operator').textContent = data.operator;
+        document.getElementById('res-status').innerHTML     =
+            '<span class="badge badge-pending">PENDING</span>';
+        document.getElementById('res-created').textContent  =
+            new Date(data.createdAt).toLocaleString('en-IN');
+
+        const card = document.getElementById('result-card');
+        card.className     = 'result-card success';
+        card.style.display = 'block';
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        showToast('Recharge request submitted successfully.', 'success');
+
+      } else {
+        const msg = data.message || data.error || 'Submission failed.';
+        showToast(msg, 'danger');
+        isSubmitting = false;
+      }
+
+    } catch (err) {
+      closeModal();
+      showToast('Network error. Is Spring Boot running?', 'danger');
+      console.error(err);
+      isSubmitting = false;
+    }
+  }
+
+  function resetForm() {
+    document.getElementById('msisdn').value = '';
+    document.getElementById('amount').value = '';
+
+    // Deselect all plan cards
+    document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+
+    // Only reset operator if admin
+    if (role !== 'DEALER') {
+      document.getElementById('operator').value = '';
+    }
+
+    clearErrors();
+    const card = document.getElementById('result-card');
+    card.style.display = 'none';
+    card.className = 'result-card';
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled    = false;
+    btn.textContent = 'Submit Request';
+    isSubmitting = false;
+  }
+</script>
+</body>
+</html>

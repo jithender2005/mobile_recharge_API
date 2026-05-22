@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RechargePro — Search & Filter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-brand">RechargePro</div>
+  <div class="nav-links">
+    <a href="javascript:void(0)" class="nav-link" id="nav-dashboard-link">Dashboard</a>
+    <a href="search.html" class="nav-link active">Search</a>
+  </div>
+  <div class="nav-right">
+    <span class="nav-user" id="nav-user"></span>
+    <button class="btn-ghost" onclick="logout()">Sign Out</button>
+  </div>
+</nav>
+
+<main class="page">
+
+  <div class="page-header">
+    <h1 class="page-title">Network Portal Search</h1>
+    <p class="page-sub" id="page-sub">Select an infrastructure provider to audit active transactions</p>
+  </div>
+
+  <div class="section-label" style="margin-bottom:16px">Step 1: Select Infrastructure Provider</div>
+  <div class="operator-grid" id="operator-selection-zone">
+    <div class="operator-card" id="op-JIO" onclick="selectOperator('JIO')">
+      <div class="op-logo">JIO</div>
+      <div class="op-meta">Network Tier I</div>
+    </div>
+    <div class="operator-card" id="op-AIRTEL" onclick="selectOperator('AIRTEL')">
+      <div class="op-logo">AIRTEL</div>
+      <div class="op-meta">Network Tier II</div>
+    </div>
+    <div class="operator-card" id="op-BSNL" onclick="selectOperator('BSNL')">
+      <div class="op-logo">BSNL</div>
+      <div class="op-meta">Network State</div>
+    </div>
+    <div class="operator-card" id="op-VI" onclick="selectOperator('VI')">
+      <div class="op-logo">VI</div>
+      <div class="op-meta">Network Core</div>
+    </div>
+  </div>
+
+  <div id="drilldown-segment" style="display: none; margin-top: 40px;">
+
+    <div class="section-label" style="margin-bottom:12px">Step 2: Filter Group Target</div>
+    <div class="tab-row">
+      <button class="tab-btn" id="t-pending" onclick="setTabFilter('PENDING')">Pending Requests</button>
+      <button class="tab-btn" id="t-completed" onclick="setTabFilter('COMPLETED')">Completed Executions</button>
+      <button class="tab-btn" id="t-failed" onclick="setTabFilter('FAILED')">Failed Overflows</button>
+    </div>
+
+    <div class="search-row" style="max-width: 500px; margin-bottom: 32px;">
+      <input type="text" id="msisdn-input" class="form-input"
+             placeholder="Refine tracking by device MSISDN number..."
+             maxlength="10" inputmode="numeric"
+             onkeydown="if(event.key==='Enter') executionSearchQuery()">
+      <button class="btn-primary" onclick="executionSearchQuery()" style="padding: 13px 24px;">Search</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+        <tr>
+          <th>ID</th>
+          <th>MSISDN</th>
+          <th>Amount</th>
+          <th>Operator</th>
+          <th>Status</th>
+          <th>Timestamp Reference</th>
+          <th id="action-header-cell">Operation Engine</th>
+        </tr>
+        </thead>
+        <tbody id="search-output-body">
+        <tr><td colspan="7" class="empty-state">Select configuration parameters to filter data tables.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<a href="submit.html" class="fab-submit">
+  +
+  <span class="fab-tooltip">New Request</span>
+</a>
+
+<div id="toast"></div>
+
+<script>
+  const token    = sessionStorage.getItem('rp_token');
+  const role     = sessionStorage.getItem('rp_role');
+  const userOp   = sessionStorage.getItem('rp_operator');
+  const API      = '';
+
+  let selectedOperator = null;
+  let activeStatusTab  = 'PENDING';
+
+  if (!token) window.location.href = 'index.html';
+
+  document.getElementById('nav-dashboard-link').href = role === 'ADMIN' ? 'dashboard.html' : 'dealer-dashboard.html';
+  document.getElementById('nav-user').textContent = sessionStorage.getItem('rp_user') || 'User';
+
+  if (role === 'DEALER' && userOp) {
+      document.getElementById('page-sub').textContent = `Operator Node Boundary: Restricted to ${userOp} telemetry streams.`;
+      ['JIO','AIRTEL','BSNL','VI'].forEach(op => {
+          if(op !== userOp) {
+              const card = document.getElementById(`op-${op}`);
+              if(card) {
+                  card.style.opacity = '0.15';
+                  card.style.pointerEvents = 'none';
+              }
+          }
+      });
+  }
+
+  if (role !== 'ADMIN') {
+      const actHeader = document.getElementById('action-header-cell');
+      if(actHeader) actHeader.style.display = 'none';
+  }
+
+  function logout() {
+      sessionStorage.clear();
+      window.location.href = 'index.html';
+  }
+
+  function showToast(msg, type = 'default') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className   = type;
+      t.style.display = 'block';
+      setTimeout(() => t.style.display = 'none', 3500);
+  }
+
+  function badgeFor(status) {
+      const map = {
+          PENDING:   '<span class="badge badge-pending">Pending</span>',
+          COMPLETED: '<span class="badge badge-completed">Completed</span>',
+          FAILED:    '<span class="badge badge-failed">Failed</span>',
+      };
+      return map[status] || status;
+  }
+
+  function formatDate(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleString('en-IN', {
+          day: '2-digit', month: 'short', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+      });
+  }
+
+  function renderActionNode(id, status) {
+      const viewBtn = `<a href="detail.html?id=${id}" class="action-btn" style="text-decoration:none">View</a>`;
+      if (role !== 'ADMIN' || status !== 'PENDING') return viewBtn;
+      return `
+          <button class="action-btn complete" onclick="triggerStateMutation(${id},'complete')">Complete</button>
+          <button class="action-btn fail" onclick="triggerStateMutation(${id},'fail')">Fail</button>
+          ${viewBtn}
+      `;
+  }
+
+  function selectOperator(op) {
+      if (role === 'DEALER' && userOp && userOp !== op) return;
+
+      selectedOperator = op;
+      ['JIO','AIRTEL','BSNL','VI'].forEach(o => {
+          const card = document.getElementById(`op-${o}`);
+          if(card) card.classList.toggle('active', o === op);
+      });
+
+      document.getElementById('drilldown-segment').style.display = 'block';
+      pullFilteredDataPipeline();
+  }
+
+  function setTabFilter(status) {
+      activeStatusTab = status;
+      ['PENDING','COMPLETED','FAILED'].forEach(s => {
+          const btn = document.getElementById(`t-${s.toLowerCase()}`);
+          if(btn) btn.classList.toggle('active', s === status);
+      });
+      document.getElementById('msisdn-input').value = '';
+      pullFilteredDataPipeline();
+  }
+
+  async function pullFilteredDataPipeline() {
+      const body = document.getElementById('search-output-body');
+      body.innerHTML = `<tr><td colspan="7" class="empty-state"><span class="spinner"></span> Querying target database index matching ${selectedOperator}...</td></tr>`;
+
+      try {
+          const res = await fetch(`${API}/api/recharges/status?status=${activeStatusTab}&size=200`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+          const records = data.content || [];
+          const finalSet = records.filter(r => r.operator === selectedOperator);
+          populateTableRows(finalSet);
+      } catch (err) {
+          body.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:var(--danger)">Core API read operation connection timed out.</td></tr>`;
+      }
+  }
+
+  async function executionSearchQuery() {
+      const inputVal = document.getElementById('msisdn-input').value.trim();
+      if(!inputVal) {
+          pullFilteredDataPipeline();
+          return;
+      }
+
+      const body = document.getElementById('search-output-body');
+      body.innerHTML = `<tr><td colspan="7" class="empty-state"><span class="spinner"></span> Isolation lookup processing active...</td></tr>`;
+
+      try {
+          const res = await fetch(`${API}/api/recharges?msisdn=${encodeURIComponent(inputVal)}&size=100`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+          const records = data.content || [];
+          const filteredSet = records.filter(r => r.operator === selectedOperator && r.status === activeStatusTab);
+          populateTableRows(filteredSet);
+      } catch(e) {
+          body.innerHTML = `<tr><td colspan="7" class="empty-state" style="color:var(--danger)">Error executing refined targeted sequence lookup.</td></tr>`;
+      }
+  }
+
+  function populateTableRows(dataSet) {
+      const body = document.getElementById('search-output-body');
+      if (dataSet.length === 0) {
+          body.innerHTML = `<tr><td colspan="7" class="empty-state">No matching records found for ${selectedOperator} containing state parameter [${activeStatusTab}].</td></tr>`;
+          return;
+      }
+
+      body.innerHTML = dataSet.map(r => `
+          <tr>
+              <td><span class="mono">#${r.id}</span></td>
+              <td>${r.msisdn}</td>
+              <td style="color:var(--gold)">₹${Number(r.amount).toFixed(2)}</td>
+              <td>${r.operator}</td>
+              <td>${badgeFor(r.status)}</td>
+              <td><span class="mono" style="font-size:12px">${formatDate(r.createdAt)}</span></td>
+              <td id="row-act-${r.id}" ${role !== 'ADMIN' ? 'style="display:none"' : ''}>
+                  ${renderActionNode(r.id, r.status)}
+              </td>
+          </tr>
+      `).join('');
+  }
+
+  async function triggerStateMutation(id, action) {
+      const cell = document.getElementById(`row-act-${id}`);
+      if(cell) cell.innerHTML = '<span class="spinner"></span>';
+
+      try {
+          const res = await fetch(`${API}/api/recharges/${id}/${action}`, {
+              method: 'PATCH',
+              headers: { 'Authorization': `Bearer ${token}` }
+          });
+
+          if (res.ok) {
+              showToast('State modification instruction authorized successfully.', 'success');
+              pullFilteredDataPipeline();
+          } else {
+              showToast('Target state modification instruction rejected by core engine.', 'danger');
+              pullFilteredDataPipeline();
+          }
+      } catch (err) {
+          showToast('Interface bus write connection error.', 'danger');
+      }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RechargePro — Dealer Terminal</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    /* ── CORE MODERN THEME OVERLAYS ───────────────────────── */
+    :root {
+        --bg-main: #080808;
+        --bg-card-glass: #101010;
+        --bg-input-field: #161616;
+        --border-glass: #1e1e1c;
+        --text-bright: #F0EDE6;
+        --text-soft: #7a7870;
+        --color-success: #4a9e72;
+        --color-warning: #c9921a;
+        --color-danger: #c95555;
+    }
+
+    body {
+        background: var(--bg-main);
+        color: var(--text-bright);
+        min-height: 100vh;
+    }
+
+    /* ── PREMIUM STAT RIBBON TILES ────────────────────────── */
+    .telemetry-row-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr) 1.2fr;
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+    .glass-telemetry-card {
+        background: var(--bg-card-glass);
+        border: 1px solid var(--border-glass);
+        padding: 20px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .metric-title {
+        font-size: 10px;
+        color: var(--text-soft);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+    .metric-value {
+        font-family: 'Cormorant Garamond', serif;
+        font-size: 36px;
+        font-weight: 600;
+        line-height: 1;
+    }
+
+    /* ── BASE WORKSPACE GLASS COMPONENTS ──────────────────── */
+    .premium-glass-card {
+        background: var(--bg-card-glass);
+        border: 1px solid var(--border-glass);
+        padding: 32px;
+        margin-bottom: 32px;
+    }
+    .card-title-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+    }
+    .card-heading-string {
+        font-size: 11px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--text-soft);
+        font-weight: 600;
+    }
+
+    /* ── INSTANT POS QUICK RECHARGE LAYOUT ────────────────── */
+    .pos-flex-row {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr 1fr auto;
+        gap: 16px;
+        align-items: flex-end;
+    }
+    .pos-input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .pos-input-element {
+        width: 100%;
+        background: var(--bg-input-field);
+        border: 1px solid var(--border-glass);
+        color: var(--text-bright);
+        padding: 13px 16px;
+        font-family: 'DM Sans', sans-serif;
+        font-size: 15px;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+    .pos-input-element:focus {
+        border-color: var(--gold-dim);
+    }
+    .pos-static-lock {
+        background: rgba(255,255,255,0.02);
+        color: var(--text-soft);
+        cursor: not-allowed;
+        font-weight: 600;
+        letter-spacing: 1px;
+        text-align: center;
+    }
+    .btn-gold-action {
+        background: var(--gold);
+        color: #080808;
+        font-weight: 600;
+        font-size: 12px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        padding: 15px 32px;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    .btn-gold-action:hover {
+        background: var(--gold-light);
+    }
+
+    /* ── OVERRIDE BADGES AND TABLES TO MATCH DESIGN ──────── */
+    .status-dot-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        font-weight: 500;
+    }
+    .dot-indicator { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    .table-modern th {
+        background: var(--bg-card-glass);
+        color: var(--text-soft);
+        border-bottom: 1px solid var(--border-glass);
+    }
+    .table-modern td {
+        border-bottom: 1px solid var(--border-glass);
+        padding: 16px 20px;
+    }
+    .table-modern tr:last-child td { border-bottom: none; }
+
+    .operator-pill-node {
+        display: inline-block;
+        padding: 3px 10px;
+        border: 1px solid var(--gold-dim);
+        color: var(--gold);
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin-left: 12px;
+        vertical-align: middle;
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-brand">RechargePro</div>
+  <div class="nav-links">
+    <a href="dealer-dashboard.html" class="nav-link active">Dashboard</a>
+    <a href="search.html" class="nav-link">Search</a>
+  </div>
+  <div class="nav-right">
+    <span class="nav-user" id="nav-user">—</span>
+    <button class="btn-ghost" onclick="logout()">Sign Out</button>
+  </div>
+</nav>
+
+<main class="page">
+
+  <div class="page-header" style="display: flex; justify-content: space-between; align-items: flex-end;">
+    <div>
+      <h1 class="page-title" id="welcome-string-title">Welcome, Dealer</h1>
+      <p class="page-sub">
+        Infrastructure Node Allocation:
+        <span class="operator-pill-node" id="operator-badge-node">—</span>
+      </p>
+    </div>
+  </div>
+
+  <div class="telemetry-row-grid">
+    <div class="glass-telemetry-card">
+      <span class="metric-title">Total Requests</span>
+      <span class="metric-value" id="m-total" style="color: var(--text-bright);">—</span>
+    </div>
+    <div class="glass-telemetry-card">
+      <span class="metric-title">Pending</span>
+      <span class="metric-value" id="m-pending" style="color: var(--warning);">—</span>
+    </div>
+    <div class="glass-telemetry-card">
+      <span class="metric-title">Completed</span>
+      <span class="metric-value" id="m-completed" style="color: var(--success);">—</span>
+    </div>
+    <div class="glass-telemetry-card">
+      <span class="metric-title">Failed</span>
+      <span class="metric-value" id="m-failed" style="color: var(--danger);">—</span>
+    </div>
+    <div class="glass-telemetry-card">
+      <span class="metric-title">Total Amount</span>
+      <span class="metric-value" id="m-amount" style="color: var(--gold); font-size: 26px;">₹0.00</span>
+    </div>
+  </div>
+
+  <div class="premium-glass-card">
+    <div class="card-heading-string" style="margin-bottom: 24px;">⚡ High-Speed Quick Recharge Pad</div>
+
+    <div class="pos-flex-row">
+      <div class="pos-input-group">
+        <label class="form-label">Customer Mobile Number</label>
+        <input type="text" id="pos-msisdn" class="pos-input-element" placeholder="Enter 10-digit phone number" maxlength="10" inputmode="numeric">
+      </div>
+      <div class="pos-input-group">
+        <label class="form-label">Amount Price (₹)</label>
+        <input type="number" id="pos-amount" class="pos-input-element" placeholder="e.g. 199" min="1">
+      </div>
+      <div class="pos-input-group">
+        <label class="form-label">Assigned Carrier Profile</label>
+        <input type="text" id="pos-operator" class="pos-input-element pos-static-lock" readonly>
+      </div>
+      <button class="btn-gold-action" id="pos-btn" onclick="triggerInstantSaleSubmit()">Proceed to Recharge →</button>
+    </div>
+  </div>
+
+  <div class="premium-glass-card">
+    <div class="card-title-header">
+      <span class="card-heading-string">📂 Recent Activity Logs (Last 5 Logs)</span>
+      <div class="filter-row">
+        <button class="btn-ghost filter-btn active" id="f-all" onclick="setPipelineFilter('ALL')">All</button>
+        <button class="btn-ghost filter-btn" id="f-pending" onclick="setPipelineFilter('PENDING')">Pending</button>
+        <button class="btn-ghost filter-btn" id="f-completed" onclick="setPipelineFilter('COMPLETED')">Completed</button>
+        <button class="btn-ghost filter-btn" id="f-failed" onclick="setPipelineFilter('FAILED')">Failed</button>
+      </div>
+    </div>
+
+    <div class="table-wrap" style="border:none;">
+      <table class="table-modern">
+        <thead>
+        <tr>
+          <th>ID Reference</th>
+          <th>Mobile Number</th>
+          <th>Amount Value</th>
+          <th>Status Badge</th>
+          <th>Timestamp Reference</th>
+          <th style="text-align:right">Audit View</th>
+        </tr>
+        </thead>
+        <tbody id="requests-table-body">
+        <tr><td colspan="6" class="empty-state"><span class="spinner"></span> Querying terminal stream indices...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+  const token    = sessionStorage.getItem('rp_token');
+  const role     = sessionStorage.getItem('rp_role');
+  const operator = sessionStorage.getItem('rp_operator') || 'JIO';
+  const username = sessionStorage.getItem('rp_user') || 'Dealer';
+  const API      = '';
+
+  let datasetCache   = [];
+  let filterVariable = 'ALL';
+  let writeMutex     = false;
+
+  if (!token) window.location.href = 'index.html';
+  if (role === 'ADMIN') window.location.href = 'dashboard.html';
+
+  document.getElementById('nav-user').textContent = username;
+  document.getElementById('welcome-string-title').textContent = `Welcome, ${username}`;
+  document.getElementById('operator-badge-node').textContent = operator;
+  document.getElementById('pos-operator').value = operator;
+
+  document.getElementById('pos-msisdn').addEventListener('input', function () {
+    this.value = this.value.replace(/\D/g, '').slice(0, 10);
+  });
+
+  function logout() {
+    sessionStorage.clear();
+    window.location.href = 'index.html';
+  }
+
+  function showToast(msg, type = 'default') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className   = type;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 3500);
+  }
+
+  function badgeFor(status) {
+    if(status === 'PENDING') {
+        return `<span class="status-dot-badge" style="color:var(--warning);"><span class="dot-indicator"></span>Pending</span>`;
+    } else if (status === 'COMPLETED') {
+        return `<span class="status-dot-badge" style="color:var(--success);"><span class="dot-indicator"></span>Completed</span>`;
+    } else {
+        return `<span class="status-dot-badge" style="color:var(--danger);"><span class="dot-indicator"></span>Failed</span>`;
+    }
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true
+    });
+  }
+
+  async function fetchSystemPipelineStream() {
+    try {
+      const response = await fetch(`${API}/api/recharges?size=200`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Data stream link broken.');
+
+      const data = await response.json();
+      datasetCache = (data.content || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+      const successes = datasetCache.filter(r => r.status === 'COMPLETED');
+      const financialSum = successes.reduce((acc, curr) => acc + Number(curr.amount), 0);
+
+      document.getElementById('m-total').textContent = datasetCache.length;
+      document.getElementById('m-pending').textContent = datasetCache.filter(r => r.status === 'PENDING').length;
+      document.getElementById('m-completed').textContent = successes.length;
+      document.getElementById('m-failed').textContent = datasetCache.filter(r => r.status === 'FAILED').length;
+      document.getElementById('m-amount').textContent = '₹' + financialSum.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      renderViewTableRows();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  function setPipelineFilter(f) {
+    filterVariable = f;
+    ['ALL','PENDING','COMPLETED','FAILED'].forEach(s => {
+      const btn = document.getElementById(`f-${s.toLowerCase()}`);
+      if (btn) btn.classList.toggle('active', s === f);
+    });
+    renderViewTableRows();
+  }
+
+  function renderViewTableRows() {
+    const rows = filterVariable === 'ALL' ? datasetCache : datasetCache.filter(r => r.status === filterVariable);
+    const body = document.getElementById('requests-table-body');
+
+    if (rows.length === 0) {
+      body.innerHTML = `<tr><td colspan="6" class="empty-state">No transaction logs recorded for profile status [${filterVariable}].</td></tr>`;
+      return;
+    }
+
+    // STRICT LIMIT: Slices arrays to keep layout output down to exactly 5 elements
+    body.innerHTML = rows.slice(0, 5).map(r => `
+      <tr>
+        <td><span class="mono" style="color:var(--text-soft)">#${r.id}</span></td>
+        <td><span style="font-weight:500;">${r.msisdn}</span></td>
+        <td style="color:var(--gold); font-weight:600">₹${Number(r.amount).toFixed(2)}</td>
+        <td>${badgeFor(r.status)}</td>
+        <td><span class="mono" style="font-size:12px; color:var(--text-soft)">${formatDate(r.createdAt)}</span></td>
+        <td style="text-align:right">
+          <a href="detail.html?id=${r.id}" class="action-btn" style="text-decoration:none; margin:0;">View</a>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  async function triggerInstantSaleSubmit() {
+    if (writeMutex) return;
+
+    const phone = document.getElementById('pos-msisdn').value.trim();
+    const cash  = document.getElementById('pos-amount').value;
+
+    if (!phone || !/^\d{10}$/.test(phone) || !cash || parseFloat(cash) <= 0) {
+      showToast('Validation logic error. Check entries.', 'danger');
+      return;
+    }
+
+    writeMutex = true;
+    const btn = document.getElementById('pos-btn');
+    btn.disabled = true;
+    btn.textContent = 'Processing...';
+
+    try {
+      const res = await fetch(`${API}/api/recharges`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ msisdn: phone, amount: parseFloat(cash), operator: operator })
+      });
+
+      if (res.ok) {
+        showToast('Instant request queued successfully.', 'success');
+        document.getElementById('pos-msisdn').value = '';
+        document.getElementById('pos-amount').value = '';
+        fetchSystemPipelineStream();
+      } else {
+        showToast('Gateway rule execution rejected parsing.', 'danger');
+      }
+    } catch (e) {
+      showToast('API channel connectivity timeout.', 'danger');
+    } finally {
+      writeMutex = false;
+      btn.disabled = false;
+      btn.textContent = 'Proceed to Recharge →';
+    }
+  }
+
+  fetchSystemPipelineStream();
+</script>
+</body>
+</html>

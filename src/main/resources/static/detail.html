@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RechargePro — Request Detail</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="nav-brand">RechargePro</div>
+  <div class="nav-links">
+    <a href="javascript:void(0)" class="nav-link" id="nav-dashboard-link">Dashboard</a>
+    <a href="submit.html" class="nav-link">Submit</a>
+    <a href="search.html" class="nav-link">Search</a>
+  </div>
+  <div class="nav-right">
+    <span class="nav-user" id="nav-user"></span>
+    <button class="btn-ghost" onclick="logout()">Sign Out</button>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="page">
+
+  <div class="page-header">
+    <h1 class="page-title" id="page-title">Request Detail</h1>
+    <p class="page-sub">Full details of this recharge request</p>
+  </div>
+
+  <!-- DETAIL CARD -->
+  <div class="form-card" id="detail-card">
+    <div style="text-align:center;padding:40px 0">
+      <span class="spinner"></span>
+      <p style="color:var(--text-muted);margin-top:12px">Loading...</p>
+    </div>
+  </div>
+
+  <!-- ACTION BUTTONS — admin only -->
+  <div class="btn-row" id="action-row" style="display:none">
+    <button class="btn-primary"   id="btn-complete" onclick="updateStatus('complete')">Mark as Complete</button>
+    <button class="btn-secondary" id="btn-fail"     onclick="updateStatus('fail')">Mark as Failed</button>
+  </div>
+
+  <!-- Dealer read-only notice — shown for pending requests -->
+  <div id="dealer-notice" style="display:none;margin-top:16px;
+       padding:12px 16px;border:1px solid var(--border);
+       font-size:12px;color:var(--text-muted);letter-spacing:0.5px">
+    This request is awaiting admin approval. Only an admin can approve or reject it.
+  </div>
+
+  <div style="margin-top:24px">
+    <a href="javascript:void(0)" id="back-link" class="btn-ghost" style="font-size:12px">
+      ← Back to Dashboard
+    </a>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+  // Auth guard
+  const token    = sessionStorage.getItem('rp_token');
+  const role     = sessionStorage.getItem('rp_role');
+  const operator = sessionStorage.getItem('rp_operator');
+
+  if (!token) window.location.href = 'index.html';
+
+  // Role-aware links
+  const dashHref = role === 'ADMIN' ? 'dashboard.html' : 'dealer-dashboard.html';
+  document.getElementById('nav-dashboard-link').href = dashHref;
+  document.getElementById('back-link').href          = dashHref;
+
+  document.getElementById('nav-user').textContent =
+      sessionStorage.getItem('rp_user') || 'User';
+
+  const API = '';
+
+  function authHeaders() {
+    return {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const requestId = params.get('id');
+  if (!requestId) window.location.href = dashHref;
+
+  function logout() {
+    sessionStorage.clear();
+    window.location.href = 'index.html';
+  }
+
+  function showToast(msg, type = 'default') {
+    const t = document.getElementById('toast');
+    t.textContent   = msg;
+    t.className     = type;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 3500);
+  }
+
+  function badgeFor(status) {
+    const map = {
+      PENDING:   '<span class="badge badge-pending">Pending</span>',
+      COMPLETED: '<span class="badge badge-completed">Completed</span>',
+      FAILED:    '<span class="badge badge-failed">Failed</span>',
+    };
+    return map[status] || status;
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  function renderDetail(r) {
+    document.getElementById('page-title').textContent = `Request #${r.id}`;
+
+    document.getElementById('detail-card').innerHTML = `
+      <div class="result-row">
+        <span class="result-key">Request ID</span>
+        <span class="result-value mono">#${r.id}</span>
+      </div>
+      <div class="result-row">
+        <span class="result-key">Mobile Number</span>
+        <span class="result-value">${r.msisdn}</span>
+      </div>
+      <div class="result-row">
+        <span class="result-key">Amount</span>
+        <span class="result-value" style="color:var(--gold)">
+          ₹${Number(r.amount).toFixed(2)}
+        </span>
+      </div>
+      <div class="result-row">
+        <span class="result-key">Operator</span>
+        <span class="result-value">${r.operator}</span>
+      </div>
+      <div class="result-row">
+        <span class="result-key">Status</span>
+        <span class="result-value">${badgeFor(r.status)}</span>
+      </div>
+      <div class="result-row">
+        <span class="result-key">Created At</span>
+        <span class="result-value mono" style="font-size:13px">${formatDate(r.createdAt)}</span>
+      </div>
+      <div class="result-row">
+        <span class="result-key">Updated At</span>
+        <span class="result-value mono" style="font-size:13px">${formatDate(r.updatedAt)}</span>
+      </div>
+    `;
+
+    if (r.status === 'PENDING') {
+      if (role === 'ADMIN') {
+        // Admin sees approve/reject buttons
+        document.getElementById('action-row').style.display = 'flex';
+      } else {
+        // Dealer sees read-only notice
+        document.getElementById('dealer-notice').style.display = 'block';
+      }
+    }
+  }
+
+  async function loadDetail() {
+    try {
+      const res = await fetch(`${API}/api/recharges/${requestId}`,
+          { headers: authHeaders() });
+
+      if (!res.ok) {
+        document.getElementById('detail-card').innerHTML = `
+          <p style="color:var(--danger);text-align:center;padding:40px">
+            Request #${requestId} not found.
+          </p>`;
+        return;
+      }
+
+      const data = await res.json();
+      renderDetail(data);
+
+    } catch (err) {
+      document.getElementById('detail-card').innerHTML = `
+        <p style="color:var(--danger);text-align:center;padding:40px">
+          Failed to connect. Is Spring Boot running?
+        </p>`;
+    }
+  }
+
+  async function updateStatus(action) {
+    document.getElementById('action-row').innerHTML = '<span class="spinner"></span>';
+
+    try {
+      const res = await fetch(`${API}/api/recharges/${requestId}/${action}`, {
+        method: 'PATCH',
+        headers: authHeaders()
+      });
+
+      if (res.ok) {
+        showToast(
+            `Request #${requestId} marked as ${action === 'complete' ? 'COMPLETED' : 'FAILED'}.`,
+            'success'
+        );
+        loadDetail();
+      } else {
+        const err = await res.json();
+        showToast(err.message || 'Update failed.', 'danger');
+        loadDetail();
+      }
+    } catch (err) {
+      showToast('Network error.', 'danger');
+      loadDetail();
+    }
+  }
+
+  loadDetail();
+</script>
+</body>
+</html>
