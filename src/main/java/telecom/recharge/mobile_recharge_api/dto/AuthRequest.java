@@ -1,7 +1,7 @@
 package telecom.recharge.mobile_recharge_api.dto;
 
 import lombok.Data;
-
+//                      after auth request holds user name and password
 @Data
 public class AuthRequest {
     private String username;

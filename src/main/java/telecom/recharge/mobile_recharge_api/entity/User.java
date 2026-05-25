@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 
+    //                  User entity     the user object from DB
+
 @Entity
 @Table(name = "users")
 @Data

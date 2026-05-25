@@ -13,6 +13,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+
+/*
+It checks → is this token valid? is it expired?
+If token is invalid → request is blocked, you get 401 Unauthorized
+If token is valid → request is allowed to go further
+*/
+
+
 @Component
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {

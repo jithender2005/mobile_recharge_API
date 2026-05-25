@@ -9,6 +9,17 @@ import telecom.recharge.mobile_recharge_api.dto.AuthResponse;
 import telecom.recharge.mobile_recharge_api.entity.User;
 import telecom.recharge.mobile_recharge_api.repository.UserRepository;
 
+
+//                      UserService      runs the logic -->user repository
+/*
+* UserService  →  runs the logic
+  └── UserRepository  finds your user from DB
+  └── User entity     the user object from DB
+  └── BCrypt          checks your password against the hash
+  └── JwtUtil         generates a 10-hour JWT token
+  └── AuthResponse    packages token + role + operator*/
+
+
 @Service
 @RequiredArgsConstructor
 public class UserService {

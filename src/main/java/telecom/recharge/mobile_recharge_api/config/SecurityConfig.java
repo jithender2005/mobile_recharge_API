@@ -8,6 +8,15 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+
+
+/*/api/auth/login   → ✅ Anyone can access (no token needed)
+/api/auth/signup  → ✅ Anyone can access (no token needed)
+/api/recharges/** → 🔒 Token required
+
+ */
+
+
 @Configuration
 @RequiredArgsConstructor
 public class SecurityConfig {

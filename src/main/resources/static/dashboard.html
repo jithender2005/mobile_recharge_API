@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
-    /* Premium Sign-Out Modal Styles */
     .modal-overlay {
       position: fixed;
       top: 0;
@@ -86,11 +85,56 @@
       color: #F0EDE6;
       border-color: #7a7870;
     }
-
-    /* Global Monospace Text adjustment for Reference Codes */
     .mono {
       font-family: Consolas, 'Courier New', monospace;
       letter-spacing: 0.5px;
+    }
+
+    /* Pie chart legend */
+    .pie-legend {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 16px;
+    }
+    .pie-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: #a09890;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .pie-legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .pie-legend-val {
+      margin-left: auto;
+      color: #F0EDE6;
+      font-weight: 600;
+    }
+
+    /* Chart container */
+    .chart-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+    }
+    .pie-wrap {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+    .pie-canvas-wrap {
+      flex: 1;
+      max-width: 200px;
     }
   </style>
 </head>
@@ -162,15 +206,42 @@
     </div>
   </div>
 
+  <!-- Charts: Area + Pie -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:40px">
-    <div style="background:var(--bg-card);border:1px solid var(--border);padding:24px">
+
+    <!-- Area Chart -->
+    <div class="chart-box">
       <div class="section-label" style="margin-bottom:16px">Recharges Per Day</div>
-      <canvas id="lineChart" height="120"></canvas>
+      <canvas id="areaChart" height="120"></canvas>
     </div>
-    <div style="background:var(--bg-card);border:1px solid var(--border);padding:24px">
-      <div class="section-label" style="margin-bottom:16px">Amount Recharged Per Day (₹)</div>
-      <canvas id="barChart" height="120"></canvas>
+
+    <!-- Pie Chart -->
+    <div class="chart-box">
+      <div class="section-label" style="margin-bottom:16px">Status Breakdown</div>
+      <div class="pie-wrap">
+        <div class="pie-canvas-wrap">
+          <canvas id="pieChart"></canvas>
+        </div>
+        <div class="pie-legend">
+          <div class="pie-legend-item">
+            <div class="pie-legend-dot" style="background:#c9a84c"></div>
+            Completed
+            <span class="pie-legend-val" id="legend-completed">0</span>
+          </div>
+          <div class="pie-legend-item">
+            <div class="pie-legend-dot" style="background:#e05c5c"></div>
+            Failed
+            <span class="pie-legend-val" id="legend-failed">0</span>
+          </div>
+          <div class="pie-legend-item">
+            <div class="pie-legend-dot" style="background:#7a7870"></div>
+            Pending
+            <span class="pie-legend-val" id="legend-pending">0</span>
+          </div>
+        </div>
+      </div>
     </div>
+
   </div>
 
   <div class="section-header">
@@ -232,7 +303,6 @@
       return { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
   }
 
-  /* Modal System UI Handlers */
   function showLogoutModal() {
       document.getElementById('logoutModalOverlay').classList.add('active');
   }
@@ -278,55 +348,96 @@
       });
   }
 
-  /* Dynamic Premium ID Formatter (Converts ID 91 to RP-2026-00091) */
   function formatReferenceId(id, createdAtIso) {
       const year = createdAtIso ? new Date(createdAtIso).getFullYear() : 2026;
       const paddedId = String(id).padStart(5, '0');
       return `RP-${year}-${paddedId}`;
   }
 
-  function buildCharts(all) {
-      const countByDate  = {};
-      const amountByDate = {};
+  function buildCharts(all, pendingCount, completedCount, failedCount) {
+      const countByDate = {};
 
       all.forEach(r => {
           const date = new Date(r.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
-          countByDate[date]  = (countByDate[date]  || 0) + 1;
-          amountByDate[date] = (amountByDate[date] || 0) + Number(r.amount);
+          countByDate[date] = (countByDate[date] || 0) + 1;
       });
 
-      const labels  = Object.keys(countByDate).slice(-7);
-      const counts  = labels.map(d => countByDate[d]);
-      const amounts = labels.map(d => amountByDate[d]);
+      const labels = Object.keys(countByDate).slice(-7);
+      const counts = labels.map(d => countByDate[d]);
 
-      if (window._lineChart) window._lineChart.destroy();
-      if (window._barChart)  window._barChart.destroy();
+      if (window._areaChart) window._areaChart.destroy();
+      if (window._pieChart)  window._pieChart.destroy();
 
-      const chartDefaults = {
-          responsive: true,
-          plugins: { legend: { display: false } },
-          scales: {
-              x: { ticks: { color: '#888', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
-              y: { ticks: { color: '#888', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true }
-          }
-      };
+      // ── Area Chart ──
+      const areaCtx = document.getElementById('areaChart').getContext('2d');
+      const areaGradient = areaCtx.createLinearGradient(0, 0, 0, 220);
+      areaGradient.addColorStop(0,   'rgba(201,168,76,0.45)');
+      areaGradient.addColorStop(0.6, 'rgba(201,168,76,0.12)');
+      areaGradient.addColorStop(1,   'rgba(201,168,76,0.00)');
 
-      window._lineChart = new Chart(document.getElementById('lineChart'), {
+      window._areaChart = new Chart(areaCtx, {
           type: 'line',
           data: {
               labels,
-              datasets: [{ data: counts, borderColor: '#c9a84c', backgroundColor: 'rgba(201,168,76,0.08)', borderWidth: 2, pointBackgroundColor: '#c9a84c', tension: 0.4, fill: true }]
+              datasets: [{
+                  data: counts,
+                  borderColor: '#c9a84c',
+                  backgroundColor: areaGradient,
+                  borderWidth: 2.5,
+                  pointBackgroundColor: '#c9a84c',
+                  pointBorderColor: '#080808',
+                  pointBorderWidth: 2,
+                  pointRadius: 5,
+                  pointHoverRadius: 7,
+                  tension: 0.45,
+                  fill: true
+              }]
           },
-          options: chartDefaults
+          options: {
+              responsive: true,
+              animation: { duration: 900, easing: 'easeInOutQuart' },
+              plugins: { legend: { display: false } },
+              scales: {
+                  x: { ticks: { color: '#888', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                  y: { ticks: { color: '#888', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true }
+              }
+          }
       });
 
-      window._barChart = new Chart(document.getElementById('barChart'), {
-          type: 'bar',
+      // ── Pie Chart ──
+      document.getElementById('legend-completed').textContent = completedCount;
+      document.getElementById('legend-failed').textContent    = failedCount;
+      document.getElementById('legend-pending').textContent   = pendingCount;
+
+      window._pieChart = new Chart(document.getElementById('pieChart'), {
+          type: 'doughnut',
           data: {
-              labels,
-              datasets: [{ data: amounts, backgroundColor: 'rgba(201,168,76,0.5)', borderColor: '#c9a84c', borderWidth: 1, borderRadius: 4 }]
+              labels: ['Completed', 'Failed', 'Pending'],
+              datasets: [{
+                  data: [completedCount, failedCount, pendingCount],
+                  backgroundColor: [
+                      'rgba(201,168,76,0.85)',
+                      'rgba(224,92,92,0.85)',
+                      'rgba(122,120,112,0.6)'
+                  ],
+                  borderColor: ['#c9a84c', '#e05c5c', '#7a7870'],
+                  borderWidth: 1.5,
+                  hoverOffset: 6
+              }]
           },
-          options: chartDefaults
+          options: {
+              responsive: true,
+              animation: { duration: 900, easing: 'easeInOutQuart' },
+              cutout: '68%',
+              plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                      callbacks: {
+                          label: ctx => ` ${ctx.label}: ${ctx.parsed}`
+                      }
+                  }
+              }
+          }
       });
   }
 
@@ -345,21 +456,18 @@
           const failed    = fData.content || [];
           const all       = [...pending, ...completed, ...failed];
 
-          // Stats
           document.getElementById('stat-pending').textContent   = pending.length;
           document.getElementById('stat-completed').textContent = completed.length;
           document.getElementById('stat-failed').textContent    = failed.length;
           document.getElementById('stat-total').textContent     = all.length;
           document.getElementById('pending-count-tag').textContent = `${pending.length} items waiting`;
 
-          // Total amount — sum of ALL requests
           const totalAmount = all.reduce((sum, r) => sum + Number(r.amount), 0);
           document.getElementById('stat-amount').textContent = formatAmount(totalAmount);
 
           const analyticsDataSet = [...all].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-          buildCharts(analyticsDataSet);
+          buildCharts(analyticsDataSet, pending.length, completed.length, failed.length);
 
-          // Pending table
           const pendingBody = document.getElementById('pending-table-body');
           if (pending.length === 0) {
               pendingBody.innerHTML = `<tr><td colspan="6" class="empty-state">No pending requests require attention.</td></tr>`;
@@ -380,7 +488,6 @@
               `).join('');
           }
 
-          // History table
           const historyBody = document.getElementById('history-table-body');
           const historyItems = [...all]
               .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))

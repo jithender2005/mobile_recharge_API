@@ -7,6 +7,9 @@ import org.springframework.stereotype.Component;
 import java.security.Key;
 import java.util.Date;
 
+//                      Creates the JWT token. with time limit
+
+
 @Component
 public class JwtUtil {
 
