@@ -6,6 +6,93 @@
   <title>RechargePro — Admin Dashboard</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    /* Premium Sign-Out Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .premium-modal {
+      background: #101010;
+      border: 1px solid #1e1e1c;
+      padding: 32px;
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    .modal-title {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #7a7870;
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+    .modal-body {
+      color: #F0EDE6;
+      font-size: 16px;
+      margin-bottom: 28px;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    .btn-modal-confirm {
+      background: #c9a84c;
+      color: #080808;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 12px 24px;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-modal-confirm:hover {
+      background: #dfbc5e;
+    }
+    .btn-modal-cancel {
+      background: transparent;
+      color: #7a7870;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 12px 24px;
+      border: 1px solid #1e1e1c;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-modal-cancel:hover {
+      color: #F0EDE6;
+      border-color: #7a7870;
+    }
+
+    /* Global Monospace Text adjustment for Reference Codes */
+    .mono {
+      font-family: Consolas, 'Courier New', monospace;
+      letter-spacing: 0.5px;
+    }
+  </style>
 </head>
 <body>
 
@@ -17,7 +104,7 @@
   </div>
   <div class="nav-right">
     <span class="nav-user" id="nav-user">User</span>
-    <button class="btn-ghost" onclick="logout()">Sign Out</button>
+    <button class="btn-ghost" onclick="showLogoutModal()">Sign Out</button>
   </div>
 </nav>
 
@@ -28,7 +115,6 @@
     <p class="page-sub">Live system overview and transaction tracking control</p>
   </div>
 
-  <!-- STATS GRID — 5 cards -->
   <div class="stats-grid" style="grid-template-columns: repeat(5, 1fr);">
     <div class="stat-card">
       <div class="stat-label">Total Requests</div>
@@ -61,7 +147,7 @@
       <table>
         <thead>
         <tr>
-          <th>ID</th>
+          <th>ID Reference</th>
           <th>MSISDN</th>
           <th>Amount</th>
           <th>Operator</th>
@@ -96,8 +182,8 @@
     <table>
       <thead>
       <tr>
-        <th>ID</th>
-        <th>MSISDN</th>
+        <th>ID Reference</th>
+        <th>Mobile Number</th>
         <th>Amount</th>
         <th>Operator</th>
         <th>Status</th>
@@ -119,6 +205,17 @@
   <span class="fab-tooltip">New Request</span>
 </a>
 
+<div class="modal-overlay" id="logoutModalOverlay">
+  <div class="premium-modal">
+    <div class="modal-title">System Session Security</div>
+    <div class="modal-body">Are you sure you want to terminate your current session?</div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="hideLogoutModal()">Cancel</button>
+      <button class="btn-modal-confirm" onclick="logout()">Terminate</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -133,6 +230,15 @@
 
   function authHeaders() {
       return { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+  }
+
+  /* Modal System UI Handlers */
+  function showLogoutModal() {
+      document.getElementById('logoutModalOverlay').classList.add('active');
+  }
+
+  function hideLogoutModal() {
+      document.getElementById('logoutModalOverlay').classList.remove('active');
   }
 
   function logout() {
@@ -170,6 +276,13 @@
           minimumFractionDigits: 2,
           maximumFractionDigits: 2
       });
+  }
+
+  /* Dynamic Premium ID Formatter (Converts ID 91 to RP-2026-00091) */
+  function formatReferenceId(id, createdAtIso) {
+      const year = createdAtIso ? new Date(createdAtIso).getFullYear() : 2026;
+      const paddedId = String(id).padStart(5, '0');
+      return `RP-${year}-${paddedId}`;
   }
 
   function buildCharts(all) {
@@ -253,7 +366,7 @@
           } else {
               pendingBody.innerHTML = pending.map(r => `
                   <tr>
-                      <td><span class="mono">#${r.id}</span></td>
+                      <td><span class="mono" style="color:var(--text-soft); font-size:12px;">${formatReferenceId(r.id, r.createdAt)}</span></td>
                       <td>${r.msisdn}</td>
                       <td style="color:var(--gold)">₹${Number(r.amount).toFixed(2)}</td>
                       <td><span class="operator-tag" style="font-size:10px">${r.operator}</span></td>
@@ -280,7 +393,7 @@
 
           historyBody.innerHTML = historyItems.map(r => `
               <tr>
-                  <td><span class="mono">#${r.id}</span></td>
+                  <td><span class="mono" style="color:var(--text-soft); font-size:12px;">${formatReferenceId(r.id, r.createdAt)}</span></td>
                   <td>${r.msisdn}</td>
                   <td style="color:var(--gold)">₹${Number(r.amount).toFixed(2)}</td>
                   <td>${r.operator}</td>
@@ -308,7 +421,7 @@
           });
 
           if (res.ok) {
-              showToast(`Request #${id} execution status processed successfully.`, 'success');
+              showToast(`Request processed successfully.`, 'success');
               loadDashboard();
           } else {
               const err = await res.json();

@@ -158,6 +158,90 @@
         margin-left: 12px;
         vertical-align: middle;
     }
+
+    /* Premium Sign-Out Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .premium-modal {
+      background: var(--bg-card-glass);
+      border: 1px solid var(--border-glass);
+      padding: 32px;
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    .modal-title {
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-soft);
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+    .modal-body {
+      color: var(--text-bright);
+      font-size: 16px;
+      margin-bottom: 28px;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+    .btn-modal-confirm {
+      background: var(--gold);
+      color: #080808;
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 12px 24px;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-modal-confirm:hover {
+      background: var(--gold-light);
+    }
+    .btn-modal-cancel {
+      background: transparent;
+      color: var(--text-soft);
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding: 12px 24px;
+      border: 1px solid var(--border-glass);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-modal-cancel:hover {
+      color: var(--text-bright);
+      border-color: var(--text-soft);
+    }
+    .mono {
+      font-family: Consolas, 'Courier New', monospace !important;
+      letter-spacing: 0.5px;
+    }
   </style>
 </head>
 <body>
@@ -170,7 +254,7 @@
   </div>
   <div class="nav-right">
     <span class="nav-user" id="nav-user">—</span>
-    <button class="btn-ghost" onclick="logout()">Sign Out</button>
+    <button class="btn-ghost" onclick="showLogoutModal()">Sign Out</button>
   </div>
 </nav>
 
@@ -261,6 +345,17 @@
 
 </main>
 
+<div class="modal-overlay" id="logoutModalOverlay">
+  <div class="premium-modal">
+    <div class="modal-title">System Session Security</div>
+    <div class="modal-body">Are you sure you want to terminate your current session?</div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="hideLogoutModal()">Cancel</button>
+      <button class="btn-modal-confirm" onclick="logout()">Terminate</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -285,6 +380,15 @@
   document.getElementById('pos-msisdn').addEventListener('input', function () {
     this.value = this.value.replace(/\D/g, '').slice(0, 10);
   });
+
+  /* Modal System UI Handlers */
+  function showLogoutModal() {
+    document.getElementById('logoutModalOverlay').classList.add('active');
+  }
+
+  function hideLogoutModal() {
+    document.getElementById('logoutModalOverlay').classList.remove('active');
+  }
 
   function logout() {
     sessionStorage.clear();
@@ -314,6 +418,13 @@
     return new Date(iso).toLocaleString('en-IN', {
       day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true
     });
+  }
+
+  /* Dynamic Premium ID Formatter (Converts ID 91 to RP-2026-00091) */
+  function formatReferenceId(id, createdAtIso) {
+    const year = createdAtIso ? new Date(createdAtIso).getFullYear() : 2026;
+    const paddedId = String(id).padStart(5, '0');
+    return `RP-${year}-${paddedId}`;
   }
 
   async function fetchSystemPipelineStream() {
@@ -359,10 +470,9 @@
       return;
     }
 
-    // STRICT LIMIT: Slices arrays to keep layout output down to exactly 5 elements
     body.innerHTML = rows.slice(0, 5).map(r => `
       <tr>
-        <td><span class="mono" style="color:var(--text-soft)">#${r.id}</span></td>
+        <td><span class="mono" style="color:var(--text-soft); font-size:12px;">${formatReferenceId(r.id, r.createdAt)}</span></td>
         <td><span style="font-weight:500;">${r.msisdn}</span></td>
         <td style="color:var(--gold); font-weight:600">₹${Number(r.amount).toFixed(2)}</td>
         <td>${badgeFor(r.status)}</td>
