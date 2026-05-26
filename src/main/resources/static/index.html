@@ -148,7 +148,8 @@
                 sessionStorage.setItem('rp_token',    data.token);
                 sessionStorage.setItem('rp_user',     data.username);
                 sessionStorage.setItem('rp_role',     data.role);
-                sessionStorage.setItem('rp_operator', data.operator || '');
+                session
+                Storage.setItem('rp_operator', data.operator || '');
 
                 // Redirect based on role
                 if (data.role === 'ADMIN') {

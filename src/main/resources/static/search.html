@@ -160,7 +160,7 @@
           <th>Amount</th>
           <th>Operator</th>
           <th>Status</th>
-          <th>Timestamp Reference</th>
+          <th>Updated Time</th>
           <th id="action-header-cell">Operation Engine</th>
         </tr>
         </thead>
@@ -356,7 +356,7 @@
               <td style="color:var(--gold)">₹${Number(r.amount).toFixed(2)}</td>
               <td>${r.operator}</td>
               <td>${badgeFor(r.status)}</td>
-              <td><span class="mono" style="font-size:12px">${formatDate(r.createdAt)}</span></td>
+              <td><span class="mono" style="font-size:12px">${formatDate(r.updatedAt || r.createdAt)}</span></td>
               <td id="row-act-${r.id}" ${role !== 'ADMIN' ? 'style="display:none"' : ''}>
                   ${renderActionNode(r.id, r.status)}
               </td>

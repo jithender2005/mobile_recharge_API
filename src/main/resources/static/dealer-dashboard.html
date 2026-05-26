@@ -159,7 +159,7 @@
         vertical-align: middle;
     }
 
-    /* Premium Sign-Out Modal Styles */
+    /* ── MODAL SHARED STYLES ──────────────────────────────── */
     .modal-overlay {
       position: fixed;
       top: 0;
@@ -332,7 +332,7 @@
           <th>Mobile Number</th>
           <th>Amount Value</th>
           <th>Status Badge</th>
-          <th>Timestamp Reference</th>
+          <th>Updated Time</th>
           <th style="text-align:right">Audit View</th>
         </tr>
         </thead>
@@ -345,6 +345,7 @@
 
 </main>
 
+<!-- ── SIGN OUT CONFIRMATION MODAL ─────────────────────────── -->
 <div class="modal-overlay" id="logoutModalOverlay">
   <div class="premium-modal">
     <div class="modal-title">System Session Security</div>
@@ -352,6 +353,25 @@
     <div class="modal-actions">
       <button class="btn-modal-cancel" onclick="hideLogoutModal()">Cancel</button>
       <button class="btn-modal-confirm" onclick="logout()">Terminate</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── RECHARGE CONFIRMATION MODAL ─────────────────────────── -->
+<div class="modal-overlay" id="rechargeConfirmModal">
+  <div class="premium-modal">
+    <div class="modal-title">Confirm Recharge Request</div>
+    <div class="modal-body">
+      <div style="margin-bottom: 10px; font-size: 14px; color: var(--text-soft);">Please verify the details before proceeding.</div>
+      <div style="background: var(--bg-input-field); border: 1px solid var(--border-glass); padding: 20px; text-align: left; margin-top: 12px; font-size: 14px; line-height: 2.2;">
+        <div>📱 <span style="color: var(--text-soft); font-size: 11px; letter-spacing: 1px; text-transform: uppercase;">Mobile</span>&nbsp;&nbsp;<span class="mono" id="confirm-phone" style="color: var(--text-bright); font-weight: 600; float: right;"></span></div>
+        <div style="border-top: 1px solid var(--border-glass); padding-top: 8px;">💰 <span style="color: var(--text-soft); font-size: 11px; letter-spacing: 1px; text-transform: uppercase;">Amount</span>&nbsp;&nbsp;<span id="confirm-amount" style="color: var(--gold); font-weight: 600; float: right;"></span></div>
+        <div style="border-top: 1px solid var(--border-glass); padding-top: 8px;">📡 <span style="color: var(--text-soft); font-size: 11px; letter-spacing: 1px; text-transform: uppercase;">Operator</span>&nbsp;&nbsp;<span id="confirm-operator" style="color: var(--text-bright); font-weight: 600; float: right;"></span></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="hideRechargeModal()">Cancel</button>
+      <button class="btn-modal-confirm" onclick="confirmAndSubmit()">Confirm Recharge</button>
     </div>
   </div>
 </div>
@@ -381,7 +401,7 @@
     this.value = this.value.replace(/\D/g, '').slice(0, 10);
   });
 
-  /* Modal System UI Handlers */
+  /* ── LOGOUT MODAL ─────────────────────────────────────── */
   function showLogoutModal() {
     document.getElementById('logoutModalOverlay').classList.add('active');
   }
@@ -395,6 +415,67 @@
     window.location.href = 'index.html';
   }
 
+  /* ── RECHARGE CONFIRMATION MODAL ─────────────────────── */
+  function triggerInstantSaleSubmit() {
+    if (writeMutex) return;
+
+    const phone = document.getElementById('pos-msisdn').value.trim();
+    const cash  = document.getElementById('pos-amount').value;
+
+    if (!phone || !/^\d{10}$/.test(phone) || !cash || parseFloat(cash) <= 0) {
+      showToast('Validation logic error. Check entries.', 'danger');
+      return;
+    }
+
+    // Populate confirmation modal with entered details
+    document.getElementById('confirm-phone').textContent = phone;
+    document.getElementById('confirm-amount').textContent = '₹' + parseFloat(cash).toFixed(2);
+    document.getElementById('confirm-operator').textContent = operator;
+
+    // Show the modal
+    document.getElementById('rechargeConfirmModal').classList.add('active');
+  }
+
+  function hideRechargeModal() {
+    document.getElementById('rechargeConfirmModal').classList.remove('active');
+  }
+
+  async function confirmAndSubmit() {
+    hideRechargeModal();
+
+    const phone = document.getElementById('pos-msisdn').value.trim();
+    const cash  = document.getElementById('pos-amount').value;
+
+    writeMutex = true;
+    const btn = document.getElementById('pos-btn');
+    btn.disabled = true;
+    btn.textContent = 'Processing...';
+
+    try {
+      const res = await fetch(`${API}/api/recharges`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ msisdn: phone, amount: parseFloat(cash), operator: operator })
+      });
+
+      if (res.ok) {
+        showToast('Instant request queued successfully.', 'success');
+        document.getElementById('pos-msisdn').value = '';
+        document.getElementById('pos-amount').value = '';
+        fetchSystemPipelineStream();
+      } else {
+        showToast('Gateway rule execution rejected parsing.', 'danger');
+      }
+    } catch (e) {
+      showToast('API channel connectivity timeout.', 'danger');
+    } finally {
+      writeMutex = false;
+      btn.disabled = false;
+      btn.textContent = 'Proceed to Recharge →';
+    }
+  }
+
+  /* ── TOAST NOTIFICATION ───────────────────────────────── */
   function showToast(msg, type = 'default') {
     const t = document.getElementById('toast');
     t.textContent = msg;
@@ -403,13 +484,14 @@
     setTimeout(() => t.style.display = 'none', 3500);
   }
 
+  /* ── TABLE HELPERS ────────────────────────────────────── */
   function badgeFor(status) {
-    if(status === 'PENDING') {
-        return `<span class="status-dot-badge" style="color:var(--warning);"><span class="dot-indicator"></span>Pending</span>`;
+    if (status === 'PENDING') {
+      return `<span class="status-dot-badge" style="color:var(--warning);"><span class="dot-indicator"></span>Pending</span>`;
     } else if (status === 'COMPLETED') {
-        return `<span class="status-dot-badge" style="color:var(--success);"><span class="dot-indicator"></span>Completed</span>`;
+      return `<span class="status-dot-badge" style="color:var(--success);"><span class="dot-indicator"></span>Completed</span>`;
     } else {
-        return `<span class="status-dot-badge" style="color:var(--danger);"><span class="dot-indicator"></span>Failed</span>`;
+      return `<span class="status-dot-badge" style="color:var(--danger);"><span class="dot-indicator"></span>Failed</span>`;
     }
   }
 
@@ -420,13 +502,13 @@
     });
   }
 
-  /* Dynamic Premium ID Formatter (Converts ID 91 to RP-2026-00091) */
   function formatReferenceId(id, createdAtIso) {
     const year = createdAtIso ? new Date(createdAtIso).getFullYear() : 2026;
     const paddedId = String(id).padStart(5, '0');
     return `RP-${year}-${paddedId}`;
   }
 
+  /* ── DATA FETCH & RENDER ──────────────────────────────── */
   async function fetchSystemPipelineStream() {
     try {
       const response = await fetch(`${API}/api/recharges?size=200`, {
@@ -476,52 +558,12 @@
         <td><span style="font-weight:500;">${r.msisdn}</span></td>
         <td style="color:var(--gold); font-weight:600">₹${Number(r.amount).toFixed(2)}</td>
         <td>${badgeFor(r.status)}</td>
-        <td><span class="mono" style="font-size:12px; color:var(--text-soft)">${formatDate(r.createdAt)}</span></td>
+        <td><span class="mono" style="font-size:12px; color:var(--text-soft)">${formatDate(r.updatedAt || r.createdAt)}</span></td>
         <td style="text-align:right">
           <a href="detail.html?id=${r.id}" class="action-btn" style="text-decoration:none; margin:0;">View</a>
         </td>
       </tr>
     `).join('');
-  }
-
-  async function triggerInstantSaleSubmit() {
-    if (writeMutex) return;
-
-    const phone = document.getElementById('pos-msisdn').value.trim();
-    const cash  = document.getElementById('pos-amount').value;
-
-    if (!phone || !/^\d{10}$/.test(phone) || !cash || parseFloat(cash) <= 0) {
-      showToast('Validation logic error. Check entries.', 'danger');
-      return;
-    }
-
-    writeMutex = true;
-    const btn = document.getElementById('pos-btn');
-    btn.disabled = true;
-    btn.textContent = 'Processing...';
-
-    try {
-      const res = await fetch(`${API}/api/recharges`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ msisdn: phone, amount: parseFloat(cash), operator: operator })
-      });
-
-      if (res.ok) {
-        showToast('Instant request queued successfully.', 'success');
-        document.getElementById('pos-msisdn').value = '';
-        document.getElementById('pos-amount').value = '';
-        fetchSystemPipelineStream();
-      } else {
-        showToast('Gateway rule execution rejected parsing.', 'danger');
-      }
-    } catch (e) {
-      showToast('API channel connectivity timeout.', 'danger');
-    } finally {
-      writeMutex = false;
-      btn.disabled = false;
-      btn.textContent = 'Proceed to Recharge →';
-    }
   }
 
   fetchSystemPipelineStream();
